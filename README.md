@@ -45,30 +45,6 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Make your changes and commit: `git commit -m 'Add new feature'`
-4. Push to the branch: `git push origin feature/new-feature`
-5. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [OpenWeatherMap](https://openweathermap.org/) for weather data API
-- [shadcn/ui](https://ui.shadcn.com/) for beautiful UI components
-- [Lucide](https://lucide.dev/) for icons
-- [Vercel](https://vercel.com/) for hosting platform
-
-## 📞 Support
-
-If you have any questions or issues:
-- Create an [Issue](https://github.com/chouthi/MyWeatherPWA/issues)
-- Contact: [your-email@example.com](mailto:your-email@example.com)
 
 ---
 

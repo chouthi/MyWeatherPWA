@@ -15,14 +15,6 @@ This is a responsive weather application built as a Progressive Web App (PWA) us
 - Responsive design with modern UI components
 - Error handling with fallback to demo data
 
-## Tech Stack
-
-- **Frontend**: Next.js 14, TypeScript, React
-- **Styling**: Tailwind CSS, shadcn/ui components
-- **PWA**: Service Worker, Web App Manifest
-- **API**: OpenWeatherMap API
-- **Icons**: Lucide React
-
 ## Setup
 
 1. Clone the repository

@@ -1,3 +1,4 @@
+// app/page.tsx (HomePage)
 "use client"
 
 import { WeatherHeader } from "@/components/weather-header"
@@ -11,7 +12,11 @@ import { useWeather } from "@/hooks/use-weather"
 import type { CityResult } from "@/hooks/use-city-search"
 
 export default function HomePage() {
-  const { weather, loading, error, refreshWeather, getWeatherByLocation, getWeatherByCity } = useWeather()
+  const {
+    weather, loading, error,
+    refreshWeather, getWeatherByLocation, getWeatherByCity,
+    askLocationAndFetch,
+  } = useWeather()
 
   const handleCitySelect = async (city: CityResult) => {
     await getWeatherByLocation({ lat: city.lat, lon: city.lon })
@@ -33,9 +38,20 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-6 space-y-6">
         <OfflineIndicator />
 
+        {/* Nút xin quyền vị trí theo “user gesture” */}
+        <div className="flex justify-center">
+          <button
+            onClick={askLocationAndFetch}
+            className="px-4 py-2 rounded-lg border bg-primary text-primary-foreground hover:opacity-90"
+            disabled={loading}
+          >
+            {loading ? "Đang lấy vị trí..." : "Dùng vị trí của tôi"}
+          </button>
+        </div>
+
         {loading && !weather && <WeatherSkeleton />}
 
-        {error && !weather && <ErrorDisplay error={error} onRetry={refreshWeather} />}
+        {error && !weather && <ErrorDisplay error={error} onRetry={askLocationAndFetch} />}
 
         {weather && (
           <>
@@ -46,7 +62,9 @@ export default function HomePage() {
 
         {error && weather && (
           <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">Unable to refresh data. Showing cached weather information.</p>
+            <p className="text-sm text-yellow-800">
+              Không thể cập nhật. Đang hiển thị dữ liệu cache.
+            </p>
           </div>
         )}
       </main>

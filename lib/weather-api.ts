@@ -35,7 +35,8 @@ export interface GeolocationCoords {
   lon: number
 }
 
-const API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY || "demo_key"
+// Use hardcoded API key due to env override issue
+const API_KEY = "25716f48bf804b733a791798731f8d80" 
 const BASE_URL = "https://api.openweathermap.org/data/2.5"
 
 export class WeatherAPI {
@@ -97,12 +98,19 @@ export class WeatherAPI {
     const cacheKey = this.getCacheKey("current", { lat, lon })
 
     return this.fetchWithCache(cacheKey, async () => {
+      const weatherUrl = `${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+      const forecastUrl = `${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+      
       const [currentResponse, forecastResponse] = await Promise.all([
-        fetch(`${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`),
-        fetch(`${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`),
+        fetch(weatherUrl),
+        fetch(forecastUrl),
       ])
 
       if (!currentResponse.ok || !forecastResponse.ok) {
+        console.error('API Response errors:', {
+          weather: currentResponse.status,
+          forecast: forecastResponse.status
+        })
         throw new Error("Failed to fetch weather data")
       }
 

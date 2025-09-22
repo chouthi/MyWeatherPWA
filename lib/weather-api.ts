@@ -62,12 +62,12 @@ export class WeatherAPI {
   private async fetchWithCache<T>(cacheKey: string, fetchFn: () => Promise<T>): Promise<T> {
     const cached = this.cache.get(cacheKey)
     if (cached && this.isValidCache(cached.timestamp)) {
-      console.log('📦 Using valid cache data')
+      console.log('Using valid cache data')
       return cached.data
     }
 
     try {
-      console.log('🌐 Attempting network fetch...')
+      console.log('Attempting network fetch...')
       const data = await fetchFn()
       this.cache.set(cacheKey, { data, timestamp: Date.now() })
 
@@ -84,7 +84,7 @@ export class WeatherAPI {
 
       return data
     } catch (error) {
-      console.log('❌ Network fetch failed:', error instanceof Error ? error.message : String(error))
+      console.log('Network fetch failed:', error instanceof Error ? error.message : String(error))
       
       // Try to get from localStorage if network fails
       if (typeof window !== "undefined") {
@@ -92,7 +92,7 @@ export class WeatherAPI {
         if (stored) {
           try {
             const parsed = JSON.parse(stored)
-            console.log('📦 Using localStorage cache data')
+            console.log('Using localStorage cache data')
             return parsed.data
           } catch (parseError) {
             console.warn('Failed to parse localStorage data:', parseError)
@@ -102,13 +102,13 @@ export class WeatherAPI {
       
       // Try memory cache even if expired
       if (cached) {
-        console.log('📦 Using expired cache data as fallback')
+        console.log('Using expired cache data as fallback')
         return cached.data
       }
       
       // Last resort: generate fallback data if this is a weather request
       if (cacheKey.includes('current')) {
-        console.log('🎭 Using demo fallback data')
+        console.log('Using demo fallback data')
         return this.generateFallbackData() as T
       }
       
@@ -139,11 +139,11 @@ export class WeatherAPI {
       },
       forecast: Array.from({ length: 24 }, (_, i) => ({
         time: new Date(Date.now() + i * 3600000).toISOString(),
-        temp: 25 + Math.random() * 6,
+        temp: Math.round((25 + Math.random() * 6) * 10) / 10,
         condition: "Partly Cloudy",
         icon: "02d",
-        precipitation: Math.random() * 20,
-        wind_speed: 5 + Math.random() * 10
+        precipitation: Math.round(Math.random() * 20 * 10) / 10,
+        wind_speed: Math.round((5 + Math.random() * 10) * 10) / 10
       }))
     }
   }
@@ -155,7 +155,7 @@ export class WeatherAPI {
       const weatherUrl = `${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
       const forecastUrl = `${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
       
-      console.log('🌤️ Fetching weather from API...')
+      console.log('Fetching weather from API...')
       
       const [currentResponse, forecastResponse] = await Promise.all([
         fetch(weatherUrl),
@@ -166,7 +166,7 @@ export class WeatherAPI {
         const weatherError = !currentResponse.ok ? await currentResponse.text() : null
         const forecastError = !forecastResponse.ok ? await forecastResponse.text() : null
         
-        console.error('❌ API Response errors:', {
+        console.error('API Response errors:', {
           weather: { status: currentResponse.status, error: weatherError },
           forecast: { status: forecastResponse.status, error: forecastError }
         })
@@ -186,7 +186,7 @@ export class WeatherAPI {
       const currentData = await currentResponse.json()
       const forecastData = await forecastResponse.json()
 
-      console.log('✅ Weather data fetched successfully:', currentData.name)
+      console.log('Weather data fetched successfully:', currentData.name)
       return this.transformWeatherData(currentData, forecastData)
     })
   }

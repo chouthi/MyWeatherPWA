@@ -1,7 +1,7 @@
-const CACHE_NAME = "weather-pwa-v3"
-const API_CACHE_NAME = "weather-api-v3"
-const STATIC_CACHE_NAME = "weather-static-v3"
-const IMAGES_CACHE_NAME = "weather-images-v3"
+const CACHE_NAME = "weather-pwa-v5"
+const API_CACHE_NAME = "weather-api-v5"
+const STATIC_CACHE_NAME = "weather-static-v5"
+const IMAGES_CACHE_NAME = "weather-images-v5"
 
 // Cache expiration times
 const API_CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
@@ -74,11 +74,29 @@ self.addEventListener("install", (event) => {
       caches.open(CACHE_NAME).then(async (cache) => {
         console.log('[SW] Caching core assets')
         
-        // Cache critical URLs first
+        // Check if we're online first
+        const isOnline = navigator.onLine
+        if (!isOnline) {
+          console.log('[SW] Offline - skipping asset caching, using existing cache')
+          return cache
+        }
+        
+        // Cache critical URLs first (only when online)
         const cachePromises = CRITICAL_ASSETS.map(async (url) => {
           try {
             console.log('[SW] Caching critical asset:', url)
-            const response = await fetch(url)
+            
+            // Create abort controller for timeout
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
+            
+            const response = await fetch(url, { 
+              cache: 'no-cache',
+              signal: controller.signal
+            })
+            
+            clearTimeout(timeoutId)
+            
             if (response.ok) {
               await cache.put(url, response)
               console.log('[SW] Cached:', url)
@@ -86,17 +104,30 @@ self.addEventListener("install", (event) => {
               console.warn('[SW] Failed to cache:', url, response.status)
             }
           } catch (error) {
-            console.warn('[SW] Error caching:', url, error.message)
+            // Don't log as error if we're offline - it's expected
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+              console.log('[SW] Skipping cache (offline):', url)
+            } else if (error.name === 'AbortError') {
+              console.log('[SW] Cache timeout:', url)
+            } else {
+              console.warn('[SW] Error caching:', url, error.message)
+            }
           }
         })
         
         await Promise.allSettled(cachePromises)
         
-        // Cache other assets
-        try {
-          await cache.addAll(urlsToCache.filter(url => !CRITICAL_ASSETS.includes(url)))
-        } catch (error) {
-          console.warn('[SW] Some assets failed to cache:', error.message)
+        // Cache other assets (only when online)
+        if (isOnline) {
+          try {
+            const otherAssets = urlsToCache.filter(url => !CRITICAL_ASSETS.includes(url))
+            if (otherAssets.length > 0) {
+              await cache.addAll(otherAssets)
+              console.log('[SW] Additional assets cached')
+            }
+          } catch (error) {
+            console.log('[SW] Some additional assets skipped:', error.message)
+          }
         }
         
         return cache
@@ -107,6 +138,9 @@ self.addEventListener("install", (event) => {
     ]).then(() => {
       console.log('[SW] Installation complete')
       return self.skipWaiting()
+    }).catch((error) => {
+      console.log('[SW] Installation completed with warnings:', error.message)
+      return self.skipWaiting() // Still proceed even if some caching failed
     })
   )
 })
@@ -118,8 +152,8 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Delete old caches (keep only v3)
-          if (!cacheName.includes('v3')) {
+          // Delete old caches (keep only v5)
+          if (!cacheName.includes('v5')) {
             console.log('[SW] Deleting old cache:', cacheName)
             return caches.delete(cacheName)
           }
@@ -297,7 +331,7 @@ async function handlePageRequest(request) {
       throw new Error("Network response not ok")
       
     } catch (error) {
-      console.log('[SW] 🔄 Network failed, using cache strategy')
+      console.log('[SW] Network failed, using cache strategy')
       
       // Try exact URL match first
       let cachedResponse = await cache.match(request.url)

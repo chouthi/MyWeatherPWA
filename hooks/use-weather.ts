@@ -2,6 +2,7 @@
 "use client"
 import { useState, useCallback } from "react"
 import { weatherAPI, type WeatherData, type GeolocationCoords } from "@/lib/weather-api"
+import { requestLocationWithSafariSupport, getSafariLocationHelp, detectMobileSafari } from "@/lib/safari-utils"
 
 export function useWeather() {
   const [weather, setWeather] = useState<WeatherData | null>(null)
@@ -38,34 +39,49 @@ export function useWeather() {
     }
   }, [])
 
-  // HÀM MỚI: chỉ gọi khi người dùng bấm nút
-  const askLocationAndFetch = useCallback(() => {
+  // HÀM MỚI: chỉ gọi khi người dùng bấm nút - tối ưu cho Safari iOS
+  const askLocationAndFetch = useCallback(async () => {
     setError(null)
+    
     if (!("geolocation" in navigator)) {
       setError("Thiết bị không hỗ trợ định vị")
       return
     }
 
-    // NOTE: Gọi thẳng getCurrentPosition trong stack của onClick
     setLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          await getWeatherByLocation({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-          })
-        } finally {
-          setLoading(false)
+    
+    try {
+      const position = await requestLocationWithSafariSupport()
+      
+      await getWeatherByLocation({
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+      })
+    } catch (err: any) {
+      let errorMessage = "Không thể lấy vị trí"
+      
+      if (err.code) {
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            errorMessage = detectMobileSafari() 
+              ? `Quyền truy cập vị trí đã bị từ chối.\n\n${getSafariLocationHelp()}`
+              : "Quyền truy cập vị trí đã bị từ chối. Vui lòng bật location trong browser settings."
+            break
+          case err.POSITION_UNAVAILABLE:
+            errorMessage = "Không thể xác định vị trí. Vui lòng kiểm tra GPS và thử lại."
+            break
+          case err.TIMEOUT:
+            errorMessage = "Timeout khi lấy vị trí. Vui lòng thử lại."
+            break
+          default:
+            errorMessage = err.message || "Lỗi không xác định khi lấy vị trí"
         }
-      },
-      (err) => {
-        setLoading(false)
-        // iOS có thể trả PERMISSION_DENIED nếu gọi sai ngữ cảnh hoặc bị nhớ deny
-        setError(err?.message || "Không thể lấy vị trí")
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-    )
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
   }, [getWeatherByLocation])
 
   const refreshWeather = useCallback(async () => {

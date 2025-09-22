@@ -38,7 +38,7 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-6 space-y-6">
         <OfflineIndicator />
 
-        {/* Nút xin quyền vị trí theo “user gesture” */}
+        {/* Nút xin quyền vị trí theo "user gesture" */}
         <div className="flex justify-center">
           <button
             onClick={askLocationAndFetch}
@@ -51,7 +51,28 @@ export default function HomePage() {
 
         {loading && !weather && <WeatherSkeleton />}
 
-        {error && !weather && <ErrorDisplay error={error} onRetry={askLocationAndFetch} />}
+        {error && !weather && (
+          <div className="space-y-4">
+            <ErrorDisplay error={error} onRetry={askLocationAndFetch} />
+            
+            {/* Hướng dẫn đặc biệt cho Safari iOS */}
+            {error.includes("từ chối") && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-semibold text-blue-900 mb-2">Hướng dẫn bật định vị trên Safari iOS:</h3>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>Mở Settings (Cài đặt) trên iPhone</li>
+                  <li>Chọn Privacy & Security → Location Services</li>
+                  <li>Bật Location Services</li>
+                  <li>Tìm Safari và chọn "While Using App"</li>
+                  <li>Quay lại ứng dụng và thử lại</li>
+                </ol>
+                <p className="text-xs text-blue-600 mt-2">
+                  * Nếu vẫn không được, hãy xóa ứng dụng khỏi màn hình chính và cài lại từ Safari
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {weather && (
           <>

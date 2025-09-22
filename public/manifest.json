@@ -7,6 +7,7 @@
   "background_color": "#ffffff",
   "theme_color": "#be123c",
   "orientation": "portrait-primary",
+  "scope": "/",
   "icons": [
     {
       "src": "/icon-192x192.jpg",
@@ -22,6 +23,9 @@
     }
   ],
   "categories": ["weather", "utilities"],
-  "lang": "en",
-  "dir": "ltr"
+  "lang": "vi",
+  "dir": "ltr",
+  "permissions": ["geolocation"],
+  "prefer_related_applications": false,
+  "related_applications": []
 }

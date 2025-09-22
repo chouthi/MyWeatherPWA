@@ -20,6 +20,11 @@ export function useWeather() {
     try {
       const data = await weatherAPI.getCurrentWeather(coords.lat, coords.lon)
       setWeather(data)
+      
+      // Check if this is demo/fallback data
+      if (data.location.name === "Demo Location") {
+        setError("⚠️ Đang hiển thị dữ liệu demo. Kiểm tra kết nối mạng.")
+      }
     } catch (err) {
       handleError(err)
     } finally {

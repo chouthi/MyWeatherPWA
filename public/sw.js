@@ -1,7 +1,7 @@
-const CACHE_NAME = "weather-pwa-v2"
-const API_CACHE_NAME = "weather-api-v2"
-const STATIC_CACHE_NAME = "weather-static-v2"
-const IMAGES_CACHE_NAME = "weather-images-v2"
+const CACHE_NAME = "weather-pwa-v3"
+const API_CACHE_NAME = "weather-api-v3"
+const STATIC_CACHE_NAME = "weather-static-v3"
+const IMAGES_CACHE_NAME = "weather-images-v3"
 
 // Cache expiration times
 const API_CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
@@ -9,10 +9,22 @@ const STATIC_CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
 
 const urlsToCache = [
   "/",
-  "/manifest.json",
+  "/manifest.json", 
   "/offline",
   "/icon-192x192.jpg",
   "/icon-512x512.jpg",
+  // Add Next.js essentials
+  "/_next/static/css/",
+  "/_next/static/chunks/",
+  "/favicon.ico",
+]
+
+// Critical assets that MUST be cached for offline functionality
+const CRITICAL_ASSETS = [
+  "/",
+  "/offline", 
+  "/manifest.json",
+  "/favicon.ico"
 ]
 
 // Static assets patterns to cache
@@ -32,9 +44,17 @@ function isCacheExpired(timestamp, duration) {
 }
 
 function addTimestamp(response) {
-  const responseWithTimestamp = response.clone()
-  responseWithTimestamp.headers.set('sw-timestamp', Date.now().toString())
-  return responseWithTimestamp
+  // Create a new Response with timestamp header (can't modify existing headers)
+  return response.text().then(body => {
+    return new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: {
+        ...Object.fromEntries(response.headers.entries()),
+        'sw-timestamp': Date.now().toString()
+      }
+    })
+  })
 }
 
 function getTimestamp(response) {
@@ -51,9 +71,35 @@ self.addEventListener("install", (event) => {
   console.log('[SW] Installing...')
   event.waitUntil(
     Promise.all([
-      caches.open(CACHE_NAME).then((cache) => {
+      caches.open(CACHE_NAME).then(async (cache) => {
         console.log('[SW] Caching core assets')
-        return cache.addAll(urlsToCache)
+        
+        // Cache critical URLs first
+        const cachePromises = CRITICAL_ASSETS.map(async (url) => {
+          try {
+            console.log('[SW] Caching critical asset:', url)
+            const response = await fetch(url)
+            if (response.ok) {
+              await cache.put(url, response)
+              console.log('[SW] Cached:', url)
+            } else {
+              console.warn('[SW] Failed to cache:', url, response.status)
+            }
+          } catch (error) {
+            console.warn('[SW] Error caching:', url, error.message)
+          }
+        })
+        
+        await Promise.allSettled(cachePromises)
+        
+        // Cache other assets
+        try {
+          await cache.addAll(urlsToCache.filter(url => !CRITICAL_ASSETS.includes(url)))
+        } catch (error) {
+          console.warn('[SW] Some assets failed to cache:', error.message)
+        }
+        
+        return cache
       }),
       caches.open(STATIC_CACHE_NAME),
       caches.open(API_CACHE_NAME),
@@ -72,8 +118,8 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Delete old caches
-          if (!cacheName.includes('v2')) {
+          // Delete old caches (keep only v3)
+          if (!cacheName.includes('v3')) {
             console.log('[SW] Deleting old cache:', cacheName)
             return caches.delete(cacheName)
           }
@@ -129,7 +175,7 @@ async function handleApiRequest(request) {
     
     if (networkResponse.ok) {
       // Cache successful responses with timestamp
-      const responseToCache = addTimestamp(networkResponse.clone())
+      const responseToCache = await addTimestamp(networkResponse.clone())
       await cache.put(request, responseToCache)
       console.log('[SW] API response cached')
       return networkResponse
@@ -146,10 +192,17 @@ async function handleApiRequest(request) {
       // Return cached data even if expired (better than no data)
       if (isCacheExpired(timestamp, API_CACHE_DURATION)) {
         console.log('[SW] Returning expired cache data')
-        // Add header to indicate data is stale
-        const staleResponse = cachedResponse.clone()
-        staleResponse.headers.set('X-Cache-Status', 'stale')
-        return staleResponse
+        // Create new response with stale header (don't modify original)
+        const staleData = await cachedResponse.text()
+        return new Response(staleData, {
+          status: cachedResponse.status,
+          statusText: cachedResponse.statusText,
+          headers: {
+            ...Object.fromEntries(cachedResponse.headers.entries()),
+            'X-Cache-Status': 'stale',
+            'Content-Type': 'application/json'
+          }
+        })
       }
       
       console.log('[SW] Returning fresh cache data')
@@ -221,10 +274,92 @@ async function handleImageRequest(request) {
   }
 }
 
-// Page request handler with offline fallback
+// Page request handler with improved offline fallback
 async function handlePageRequest(request) {
   const cache = await caches.open(CACHE_NAME)
+  const url = new URL(request.url)
   
+  // For navigation requests (like hitting Enter or F5), try cache first when offline
+  if (request.mode === 'navigate') {
+    try {
+      console.log('[SW] Navigation request:', url.pathname)
+      
+      // Try network first for fresh content
+      const networkResponse = await fetch(request, { 
+        timeout: 3000 // Quick timeout for better UX
+      })
+      
+      if (networkResponse.ok) {
+        console.log('[SW] Fresh page from network')
+        await cache.put(request, networkResponse.clone())
+        return networkResponse
+      }
+      throw new Error("Network response not ok")
+      
+    } catch (error) {
+      console.log('[SW] 🔄 Network failed, using cache strategy')
+      
+      // Try exact URL match first
+      let cachedResponse = await cache.match(request.url)
+      if (cachedResponse) {
+        console.log('[SW] Exact page found in cache')
+        return cachedResponse
+      }
+      
+      // Try pathname match
+      cachedResponse = await cache.match(url.pathname)
+      if (cachedResponse) {
+        console.log('[SW] Page path found in cache')
+        return cachedResponse
+      }
+      
+      // For any unknown route, return cached index page
+      const indexResponse = await cache.match('/')
+      if (indexResponse) {
+        console.log('[SW] Fallback to cached index page')
+        return indexResponse
+      }
+      
+      // Last resort: offline page
+      const offlineResponse = await cache.match('/offline')
+      if (offlineResponse) {
+        console.log('[SW] Serving offline page')
+        return offlineResponse
+      }
+      
+      // Absolute fallback
+      console.log('[SW] No cache available, creating minimal offline response')
+      return new Response(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Offline - Weather PWA</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            .offline { color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="offline">
+            <h1>Weather PWA</h1>
+            <p>You're currently offline</p>
+            <p>Please check your internet connection and try again.</p>
+            <button onclick="window.location.reload()">Retry</button>
+          </div>
+        </body>
+        </html>
+      `, {
+        headers: { 
+          'Content-Type': 'text/html',
+          'X-Cache-Status': 'offline-fallback'
+        }
+      })
+    }
+  }
+  
+  // For other requests, try network then cache
   try {
     console.log('[SW] Fetching page from network:', request.url)
     const networkResponse = await fetch(request)

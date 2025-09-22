@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PWA Offline Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .online { background: #d4edda; color: #155724; }
+        .offline { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 PWA Offline Test</h1>
+    
+    <div id="status" class="status">Checking...</div>
+    
+    <h2>Service Worker Status</h2>
+    <div id="sw-status"></div>
+    
+    <h2>Cache Status</h2>
+    <div id="cache-status"></div>
+    
+    <h2>Network Tests</h2>
+    <button onclick="testWeatherAPI()">Test Weather API</button>
+    <button onclick="testOfflinePages()">Test Offline Pages</button>
+    <button onclick="clearCaches()">Clear All Caches</button>
+    
+    <h2>Results</h2>
+    <pre id="results"></pre>
+
+    <script>
+        let results = [];
+        
+        function log(message) {
+            results.push(`${new Date().toLocaleTimeString()}: ${message}`);
+            document.getElementById('results').textContent = results.join('\n');
+            console.log(message);
+        }
+        
+        // Check online/offline status
+        function updateStatus() {
+            const status = document.getElementById('status');
+            if (navigator.onLine) {
+                status.className = 'status online';
+                status.textContent = '🟢 ONLINE - Internet connected';
+            } else {
+                status.className = 'status offline';
+                status.textContent = '🔴 OFFLINE - No internet connection';
+            }
+        }
+        
+        // Check Service Worker
+        async function checkServiceWorker() {
+            const swStatus = document.getElementById('sw-status');
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration('/');
+                    if (registration) {
+                        const sw = registration.active || registration.waiting || registration.installing;
+                        swStatus.innerHTML = `
+                            <div class="status info">
+                                ✅ Service Worker registered<br>
+                                State: ${sw ? sw.state : 'Unknown'}<br>
+                                Script: ${registration.scope}
+                            </div>
+                        `;
+                        log('Service Worker is registered and active');
+                    } else {
+                        swStatus.innerHTML = '<div class="status offline">❌ Service Worker not registered</div>';
+                        log('Service Worker not found');
+                    }
+                } catch (error) {
+                    swStatus.innerHTML = `<div class="status offline">❌ SW Error: ${error.message}</div>`;
+                    log(`Service Worker error: ${error.message}`);
+                }
+            } else {
+                swStatus.innerHTML = '<div class="status offline">❌ Service Worker not supported</div>';
+                log('Service Worker not supported in this browser');
+            }
+        }
+        
+        // Check caches
+        async function checkCaches() {
+            const cacheStatus = document.getElementById('cache-status');
+            
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    const cacheInfo = [];
+                    
+                    for (const cacheName of cacheNames) {
+                        const cache = await caches.open(cacheName);
+                        const keys = await cache.keys();
+                        cacheInfo.push(`${cacheName}: ${keys.length} items`);
+                    }
+                    
+                    if (cacheInfo.length > 0) {
+                        cacheStatus.innerHTML = `
+                            <div class="status info">
+                                ✅ ${cacheNames.length} cache(s) found:<br>
+                                ${cacheInfo.join('<br>')}
+                            </div>
+                        `;
+                        log(`Found ${cacheNames.length} caches with cached content`);
+                    } else {
+                        cacheStatus.innerHTML = '<div class="status offline">❌ No caches found</div>';
+                        log('No caches found');
+                    }
+                } catch (error) {
+                    cacheStatus.innerHTML = `<div class="status offline">❌ Cache Error: ${error.message}</div>`;
+                    log(`Cache error: ${error.message}`);
+                }
+            } else {
+                cacheStatus.innerHTML = '<div class="status offline">❌ Cache API not supported</div>';
+                log('Cache API not supported');
+            }
+        }
+        
+        // Test Weather API
+        async function testWeatherAPI() {
+            log('Testing Weather API...');
+            try {
+                const response = await fetch('/api/weather?lat=21&lon=105');
+                if (response.ok) {
+                    log('✅ Weather API responded successfully');
+                } else {
+                    log(`❌ Weather API failed: ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Weather API error: ${error.message}`);
+                // Test if fallback data works
+                log('Testing if app shows cached/demo data...');
+            }
+        }
+        
+        // Test offline pages
+        async function testOfflinePages() {
+            log('Testing offline pages...');
+            const testUrls = ['/', '/offline'];
+            
+            for (const url of testUrls) {
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        log(`✅ ${url} accessible`);
+                    } else {
+                        log(`❌ ${url} failed: ${response.status}`);
+                    }
+                } catch (error) {
+                    log(`❌ ${url} error: ${error.message}`);
+                }
+            }
+        }
+        
+        // Clear all caches
+        async function clearCaches() {
+            log('Clearing all caches...');
+            try {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
+                log(`✅ Cleared ${cacheNames.length} cache(s)`);
+                checkCaches(); // Refresh cache status
+            } catch (error) {
+                log(`❌ Clear cache error: ${error.message}`);
+            }
+        }
+        
+        // Event listeners
+        window.addEventListener('online', () => {
+            updateStatus();
+            log('🟢 Back online');
+        });
+        
+        window.addEventListener('offline', () => {
+            updateStatus();
+            log('🔴 Gone offline');
+        });
+        
+        // Initialize
+        updateStatus();
+        checkServiceWorker();
+        checkCaches();
+        
+        log('Offline test page loaded. Try disconnecting internet to test!');
+    </script>
+</body>
+</html>

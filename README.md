@@ -1,3 +1,4 @@
+Phát triển ứng dụng di động đa nền tảng (1) - Nguyễn Thị Châu Thi - 22IT274
 # Weather PWA
 
 A modern Progressive Web App for weather forecasting with offline capabilities.
